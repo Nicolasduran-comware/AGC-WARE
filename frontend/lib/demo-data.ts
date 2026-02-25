@@ -16,10 +16,10 @@ export const demoInvoice: InvoiceData = {
   rfcEmisor: "TAV200315KJ8",
   rfcReceptor: "AGC180901LP4",
   fecha: "2026-02-20",
-  subtotal: 45800.0,
-  iva: 7328.0,
-  total: 53128.0,
-  moneda: "MXN",
+  subtotal: 9847000.0,
+  iva: 1575520.0,
+  total: 11422520.0,
+  moneda: "COP",
   uuid: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
   tipoComprobante: "Ingreso",
   status: "recibida",
@@ -27,14 +27,14 @@ export const demoInvoice: InvoiceData = {
     {
       descripcion: "Servicio de consultoría tecnológica",
       cantidad: 1,
-      valorUnitario: 35000.0,
-      importe: 35000.0,
+      valorUnitario: 7525000.0,
+      importe: 7525000.0,
     },
     {
       descripcion: "Licencias de software empresarial",
       cantidad: 3,
-      valorUnitario: 3600.0,
-      importe: 10800.0,
+      valorUnitario: 774000.0,
+      importe: 2322000.0,
     },
   ],
 }
@@ -65,7 +65,7 @@ export const demoRecommendation: AIRecommendation = {
   confidence: 96,
   reasoning:
     "La factura cumple con todas las validaciones fiscales. El proveedor tiene historial positivo (12 transacciones previas). El monto está dentro del presupuesto autorizado para el centro de costo CC-TI-2026. Se recomienda aprobar y enviar al ERP.",
-  flags: ["Monto superior a $50,000"],
+  flags: ["Monto superior a $10,750,000"],
 }
 
 export const demoERPResult: ERPResult = {
@@ -219,7 +219,7 @@ export function getDemoAuditLog(step: number): AuditEntry[] {
       id: "aud-5",
       timestamp: "14:29",
       action: "Alerta",
-      detail: "Monto superior a $50,000 MXN",
+      detail: "Monto superior a $10,750,000 COP",
       user: "Motor IA",
       status: "warning",
     },

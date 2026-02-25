@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { AppSidebar } from "@/components/agc/app-sidebar"
 import { ChatPanel } from "@/components/agc/chat-panel"
 import { ContextPanel } from "@/components/agc/context-panel"
@@ -20,17 +20,43 @@ import {
   demoValidation,
   demoClassification,
   demoRecommendation,
-  demoConversations,
 } from "@/lib/demo-data"
+
+// ---- Conversation storage ----
+interface ConversationRecord {
+  id: string
+  title: string
+  date: string
+  messages: ChatMessage[]
+}
+
+function getTimestamp() {
+  return new Date().toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function formatDate() {
+  const now = new Date()
+  const h = now.getHours().toString().padStart(2, "0")
+  const m = now.getMinutes().toString().padStart(2, "0")
+  return `Hoy, ${h}:${m}`
+}
+
+const DEMO_CONVERSATION_ID = "demo-conv"
 
 export default function AGCWarePage() {
   // Sidebar state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeSection, setActiveSection] = useState("chat")
-  const [activeConversation, setActiveConversation] = useState<string | null>("conv-1")
 
   // Context panel state
   const [contextCollapsed, setContextCollapsed] = useState(false)
+
+  // Conversations
+  const [conversations, setConversations] = useState<ConversationRecord[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
 
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -48,22 +74,39 @@ export default function AGCWarePage() {
   const [demoStep, setDemoStep] = useState(0)
   const [demoStarted, setDemoStarted] = useState(false)
 
+  // Track if current session is demo
+  const isDemoRef = useRef(false)
+
   const { messages: demoMessages, delays } = getDemoMessages()
 
-  // Status progression for invoice
+  // ---- Persist messages back to conversations ----
+  useEffect(() => {
+    if (!activeConversationId || isDemoRef.current) return
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeConversationId ? { ...c, messages } : c
+      )
+    )
+  }, [messages, activeConversationId])
+
+  // ---- Generate title from first user message ----
+  const updateConversationTitle = useCallback(
+    (convId: string, firstUserMsg: string) => {
+      const title =
+        firstUserMsg.length > 40
+          ? firstUserMsg.slice(0, 40) + "..."
+          : firstUserMsg
+      setConversations((prev) =>
+        prev.map((c) => (c.id === convId ? { ...c, title } : c))
+      )
+    },
+    []
+  )
+
+  // Status progression for invoice demo
   const statusProgression: (InvoiceStatus | null)[] = [
-    null,        // msg-1: welcome
-    null,        // msg-2: user asks
-    null,        // msg-3: bot asks for file
-    "recibida",  // msg-4: file uploaded
-    "validando", // msg-5: status update
-    "validada",  // msg-6: validation result
-    "clasificada", // msg-7: classification
-    "aprobada",  // msg-8: recommendation
-    null,        // msg-9: user approves
-    "enviando_erp", // msg-10: sending
-    "enviada_erp", // msg-11: erp result
-    "enviada_erp", // msg-12: complete
+    null, null, null, "recibida", "validando", "validada",
+    "clasificada", "aprobada", null, "enviando_erp", "enviada_erp", "enviada_erp",
   ]
 
   const advanceDemo = useCallback(() => {
@@ -72,7 +115,6 @@ export default function AGCWarePage() {
     const nextMessage = demoMessages[demoStep]
     const nextStatus = statusProgression[demoStep]
 
-    // Show processing indicator before bot messages
     if (nextMessage.sender === "bot" && demoStep > 0) {
       setIsProcessing(true)
       const loadingTexts: Record<number, string> = {
@@ -80,7 +122,7 @@ export default function AGCWarePage() {
         4: "Procesando factura...",
         5: "Validando factura con SAT...",
         6: "Clasificando contablemente...",
-        7: "Generando recomendación IA...",
+        7: "Generando recomendacion IA...",
         9: "Enviando al ERP...",
         10: "Confirmando registro...",
         11: "Generando resumen...",
@@ -94,39 +136,28 @@ export default function AGCWarePage() {
         setProcessingText(undefined)
         setMessages((prev) => [...prev, nextMessage])
 
-        // Update invoice context
         if (nextStatus) {
           setCurrentInvoice((prev) => {
-            if (!prev && demoStep >= 3) {
-              return { ...demoInvoice, status: nextStatus }
-            }
+            if (!prev && demoStep >= 3) return { ...demoInvoice, status: nextStatus }
             return prev ? { ...prev, status: nextStatus } : null
           })
         }
 
-        // Update validation/classification/recommendation
         if (demoStep === 5) setCurrentValidation(demoValidation)
         if (demoStep === 6) setCurrentClassification(demoClassification)
         if (demoStep === 7) setCurrentRecommendation(demoRecommendation)
 
-        // Update audit log
         setAuditLog(getDemoAuditLog(demoStep))
-
         setDemoStep((prev) => prev + 1)
       }, typingDelay)
     } else {
-      // User messages appear immediately
       setMessages((prev) => [...prev, nextMessage])
-
       if (nextStatus) {
         setCurrentInvoice((prev) => {
-          if (!prev && demoStep >= 3) {
-            return { ...demoInvoice, status: nextStatus }
-          }
+          if (!prev && demoStep >= 3) return { ...demoInvoice, status: nextStatus }
           return prev ? { ...prev, status: nextStatus } : null
         })
       }
-
       setAuditLog(getDemoAuditLog(demoStep))
       setDemoStep((prev) => prev + 1)
     }
@@ -145,59 +176,125 @@ export default function AGCWarePage() {
     return () => clearTimeout(timer)
   }, [demoStep, demoStarted, isProcessing, advanceDemo, demoMessages.length])
 
-  // Start demo on mount
-  useEffect(() => {
-    setDemoStarted(true)
-  }, [])
+  // ---- n8n send message ----
+  const sendToN8N = async (userContent: string): Promise<string> => {
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userContent,
+          conversationId: activeConversationId,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Error del servidor")
+      }
+      const data = await res.json()
+      return data.reply || "Sin respuesta del servicio."
+    } catch (error) {
+      console.error("[v0] Error sending to n8n:", error)
+      throw error
+    }
+  }
 
-  const handleSendMessage = (content: string) => {
-    const newMessage: ChatMessage = {
+  // ---- Format assistant text from n8n ----
+  function formatAssistantText(text: string): string {
+    if (!text) return text
+
+    let formatted = text
+
+    // Saltos de línea antes de enumeraciones tipo "1)" "2)" etc.
+    formatted = formatted.replace(/\s+(\d+\))/g, "\n$1")
+
+    // Saltos de línea después de puntos, excepto el último punto del texto
+    const trimmed = formatted.trimEnd()
+    const lastDotIndex = trimmed.lastIndexOf(".")
+
+    if (lastDotIndex > -1) {
+      const beforeLastDot = trimmed.slice(0, lastDotIndex)
+      const fromLastDot = trimmed.slice(lastDotIndex)
+      // Reemplaza ". " por ".\n" sólo en la parte anterior al último punto
+      const beforeWithBreaks = beforeLastDot.replace(/\. /g, ".\n")
+      formatted = beforeWithBreaks + fromLastDot
+    }
+
+    return formatted
+  }
+
+  // ---- Handlers ----
+  const handleSendMessage = async (content: string) => {
+    // If this is the first message and no active conversation, create one
+    let convId = activeConversationId
+    if (!convId) {
+      convId = `conv-${Date.now()}`
+      const newConv: ConversationRecord = {
+        id: convId,
+        title: "Nueva conversacion",
+        date: formatDate(),
+        messages: [],
+      }
+      setConversations((prev) => [newConv, ...prev])
+      setActiveConversationId(convId)
+    }
+
+    const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
       type: "text",
       content,
-      timestamp: new Date().toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      timestamp: getTimestamp(),
     }
-    setMessages((prev) => [...prev, newMessage])
+    setMessages((prev) => [...prev, userMessage])
 
-    // Simulate bot response
+    // Update title from first user message
+    const currentConv = conversations.find((c) => c.id === convId)
+    if (!currentConv || currentConv.messages.length === 0) {
+      updateConversationTitle(convId, content)
+    }
+
+    // Send to n8n
     setIsProcessing(true)
-    setProcessingText("Analizando consulta...")
-    setTimeout(() => {
+    setProcessingText("Procesando...")
+
+    try {
+      const reply = await sendToN8N(content)
+      const formattedReply = formatAssistantText(reply)
       setIsProcessing(false)
       setProcessingText(undefined)
+
       const botResponse: ChatMessage = {
         id: `bot-${Date.now()}`,
         sender: "bot",
         type: "text",
-        content:
-          "Entendido. Estoy procesando tu solicitud. Puedes adjuntar un archivo XML para iniciar un nuevo flujo de procesamiento, o preguntarme sobre el estado de cualquier factura.",
-        timestamp: new Date().toLocaleTimeString("es-MX", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        content: formattedReply,
+        timestamp: getTimestamp(),
       }
       setMessages((prev) => [...prev, botResponse])
-    }, 1500)
+    } catch {
+      setIsProcessing(false)
+      setProcessingText(undefined)
+
+      const errorResponse: ChatMessage = {
+        id: `bot-err-${Date.now()}`,
+        sender: "bot",
+        type: "error",
+        content: "No se pudo conectar con el servicio de IA. Intenta de nuevo.",
+        timestamp: getTimestamp(),
+      }
+      setMessages((prev) => [...prev, errorResponse])
+    }
   }
 
   const handleAction = (action: string) => {
-    if (action === "aprobar" && demoStep < demoMessages.length) {
-      // Continue demo flow after approval
-      return
-    }
+    if (action === "aprobar" && demoStep < demoMessages.length) return
     const actionMessage: ChatMessage = {
       id: `action-${Date.now()}`,
       sender: "user",
       type: "text",
-      content: `Acción seleccionada: ${action}`,
-      timestamp: new Date().toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      content: `Accion seleccionada: ${action}`,
+      timestamp: getTimestamp(),
     }
     setMessages((prev) => [...prev, actionMessage])
   }
@@ -208,16 +305,13 @@ export default function AGCWarePage() {
       sender: "user",
       type: "file_upload",
       content: "Archivo adjuntado.",
-      timestamp: new Date().toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      timestamp: getTimestamp(),
       data: { fileName: "factura_ejemplo.xml" },
     }
     setMessages((prev) => [...prev, uploadMessage])
   }
 
-  const handleNewConversation = () => {
+  const resetState = () => {
     setMessages([])
     setCurrentInvoice(null)
     setCurrentValidation(null)
@@ -226,13 +320,68 @@ export default function AGCWarePage() {
     setAuditLog([])
     setDemoStep(0)
     setDemoStarted(false)
-    setActiveConversation(null)
+    setIsProcessing(false)
+    setProcessingText(undefined)
+    isDemoRef.current = false
+  }
 
-    // Restart demo after a brief pause
+  const handleNewConversation = () => {
+    resetState()
+    const convId = `conv-${Date.now()}`
+    const newConv: ConversationRecord = {
+      id: convId,
+      title: "Nueva conversacion",
+      date: formatDate(),
+      messages: [],
+    }
+    setConversations((prev) => [newConv, ...prev])
+    setActiveConversationId(convId)
+  }
+
+  const handleDemoConversation = () => {
+    resetState()
+    isDemoRef.current = true
+
+    // Crear la conversacion de ejemplo solo la primera vez
+    setConversations((prev) => {
+      const exists = prev.some((c) => c.id === DEMO_CONVERSATION_ID)
+      if (exists) return prev
+
+      const demoConv: ConversationRecord = {
+        id: DEMO_CONVERSATION_ID,
+        title: "Ejemplo de conversacion",
+        date: formatDate(),
+        messages: demoMessages,
+      }
+
+      return [demoConv, ...prev]
+    })
+
+    setActiveConversationId(DEMO_CONVERSATION_ID)
+
     setTimeout(() => {
       setDemoStarted(true)
-    }, 500)
+    }, 300)
   }
+
+  const handleSelectConversation = (id: string) => {
+    // Save current messages if needed
+    resetState()
+    isDemoRef.current = false
+    setActiveConversationId(id)
+    const conv = conversations.find((c) => c.id === id)
+    if (conv) {
+      setMessages(conv.messages)
+    }
+  }
+
+  // Map conversations to sidebar format
+  const sidebarConversations = conversations.map((c) => ({
+    id: c.id,
+    title: c.title,
+    date: c.date,
+    active: c.id === activeConversationId,
+  }))
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -240,10 +389,11 @@ export default function AGCWarePage() {
       <AppSidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        conversations={demoConversations}
-        activeConversation={activeConversation}
-        onSelectConversation={setActiveConversation}
+        conversations={sidebarConversations}
+        activeConversation={activeConversationId}
+        onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onDemoConversation={handleDemoConversation}
         activeSection={activeSection}
         onSectionChange={setActiveSection}
       />

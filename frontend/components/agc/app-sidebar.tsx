@@ -5,15 +5,27 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
+import {
   MessageSquarePlus,
-  LayoutDashboard,
-  Shield,
-  Plug,
+  Play,
   Settings,
   Bot,
   FileText,
   ChevronLeft,
   ChevronRight,
+  Database,
+  Globe,
+  UserCog,
+  Bell,
+  Shield,
+  Palette,
 } from "lucide-react"
 
 interface Conversation {
@@ -30,17 +42,12 @@ interface AppSidebarProps {
   activeConversation: string | null
   onSelectConversation: (id: string) => void
   onNewConversation: () => void
+  onDemoConversation: () => void
   activeSection: string
   onSectionChange: (section: string) => void
 }
 
-const navItems = [
-  { id: "chat", label: "Conversaciones", icon: Bot },
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "audit", label: "Auditoría", icon: Shield },
-  { id: "integrations", label: "Integraciones", icon: Plug },
-  { id: "settings", label: "Configuración", icon: Settings },
-]
+
 
 export function AppSidebar({
   collapsed,
@@ -49,6 +56,7 @@ export function AppSidebar({
   activeConversation,
   onSelectConversation,
   onNewConversation,
+  onDemoConversation,
   activeSection,
   onSectionChange,
 }: AppSidebarProps) {
@@ -82,7 +90,7 @@ export function AppSidebar({
       <Separator />
 
       {/* New Conversation Button */}
-      <div className="p-3">
+      <div className="flex flex-col gap-2 p-3">
         <Button
           onClick={onNewConversation}
           variant="outline"
@@ -92,31 +100,22 @@ export function AppSidebar({
           )}
         >
           <MessageSquarePlus className="h-4 w-4 shrink-0" />
-          {!collapsed && <span className="text-sm">Nueva conversación</span>}
+          {!collapsed && <span className="text-sm">Nueva conversacion</span>}
+        </Button>
+        <Button
+          onClick={onDemoConversation}
+          variant="ghost"
+          className={cn(
+            "w-full justify-start gap-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          <Play className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="text-sm">Ejemplo de conversacion</span>}
         </Button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex flex-col gap-1 px-3">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onSectionChange(item.id)}
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              activeSection === item.id
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-              collapsed && "justify-center px-2"
-            )}
-          >
-            <item.icon className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
-          </button>
-        ))}
-      </nav>
-
-      <Separator className="my-3 mx-3" />
+      <Separator className="mx-3" />
 
       {/* Recent Conversations */}
       {!collapsed && activeSection === "chat" && (
@@ -148,8 +147,52 @@ export function AppSidebar({
         </div>
       )}
 
-      {/* Toggle Button */}
-      <div className="mt-auto border-t border-border p-3">
+      {/* Footer: Settings + Toggle */}
+      <div className="mt-auto border-t border-border p-3 flex flex-col gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start gap-2 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors",
+                collapsed && "justify-center px-0"
+              )}
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              {!collapsed && <span className="text-sm">Configuracion</span>}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="end" className="w-56">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Configuracion</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="gap-2 cursor-pointer">
+              <Database className="h-4 w-4" />
+              <span>Conexion ERP</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2 cursor-pointer">
+              <Globe className="h-4 w-4" />
+              <span>Webhook n8n</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2 cursor-pointer">
+              <UserCog className="h-4 w-4" />
+              <span>Perfil de usuario</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="gap-2 cursor-pointer">
+              <Bell className="h-4 w-4" />
+              <span>Notificaciones</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2 cursor-pointer">
+              <Shield className="h-4 w-4" />
+              <span>Permisos y roles</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2 cursor-pointer">
+              <Palette className="h-4 w-4" />
+              <span>Apariencia</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <button
           onClick={onToggle}
           className="flex w-full items-center justify-center rounded-md py-2 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"

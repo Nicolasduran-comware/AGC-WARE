@@ -131,7 +131,7 @@ export function ChatPanel({
               >
                 <div
                   className={cn(
-                    "rounded-xl px-4 py-2.5 text-sm leading-relaxed",
+                    "rounded-xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
                     message.sender === "bot"
                       ? "bg-card border border-border text-card-foreground rounded-tl-sm"
                       : "bg-primary text-primary-foreground rounded-tr-sm"
