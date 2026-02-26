@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { useTheme } from "next-themes"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
@@ -58,6 +59,12 @@ export function AppSidebar({
   activeSection,
   onSectionChange,
 }: AppSidebarProps) {
+  const { theme, setTheme } = useTheme()
+
+  const handleToggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark")
+  }
+
   return (
     <aside
       className={cn(
@@ -176,7 +183,7 @@ export function AppSidebar({
               <Shield className="h-4 w-4" />
               <span>Permisos y roles</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 cursor-pointer">
+            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={handleToggleTheme}>
               <Palette className="h-4 w-4" />
               <span>Apariencia</span>
             </DropdownMenuItem>
