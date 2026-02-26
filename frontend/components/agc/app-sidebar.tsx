@@ -20,8 +20,6 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  Database,
-  Globe,
   UserCog,
   Bell,
   Shield,
@@ -165,14 +163,6 @@ export function AppSidebar({
           <DropdownMenuContent side="right" align="end" className="w-56">
             <DropdownMenuLabel className="text-xs text-muted-foreground">Configuracion</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 cursor-pointer">
-              <Database className="h-4 w-4" />
-              <span>Conexion ERP</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 cursor-pointer">
-              <Globe className="h-4 w-4" />
-              <span>Webhook n8n</span>
-            </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 cursor-pointer">
               <UserCog className="h-4 w-4" />
               <span>Perfil de usuario</span>
